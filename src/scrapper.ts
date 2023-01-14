@@ -1,3 +1,4 @@
+import { PrismaClient } from '@prisma/client'
 import { chromium } from 'playwright'
 import { z } from 'zod'
 
@@ -19,10 +20,19 @@ const itemsSchema = z.array(itemSchema)
 const BASE_URL =
   'https://webscraper.io/test-sites/e-commerce/allinone/computers/laptops'
 
+const prisma = new PrismaClient()
+
 const main = async () => {
+  await prisma.$connect()
+
   const browser = await chromium.launch({
     headless: true
   })
+
+  const cleanUp = async () => {
+    await prisma.$disconnect()
+    await browser.close()
+  }
 
   const page = await browser.newPage()
   await page.goto(BASE_URL)
@@ -58,8 +68,7 @@ const main = async () => {
   const validItems = itemsSchema.safeParse(laptops)
   if (!validItems.success) {
     console.error('invalid item', validItems.error)
-    await browser.close()
-    return
+    return await cleanUp()
   }
 
   const lenovoLaptops = validItems.data.filter((item) => {
@@ -68,7 +77,7 @@ const main = async () => {
   })
   console.log(`${lenovoLaptops.length} lenovo items found`)
 
-  await browser.close()
+  return await cleanUp()
 }
 
 main()
