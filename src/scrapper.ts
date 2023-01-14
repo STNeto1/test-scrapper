@@ -62,6 +62,12 @@ const main = async () => {
     return
   }
 
+  const lenovoLaptops = validItems.data.filter((item) => {
+    // switch for a regex later?
+    return item.title.toLowerCase().includes('lenovo')
+  })
+  console.log(`${lenovoLaptops.length} lenovo items found`)
+
   await browser.close()
 }
 
