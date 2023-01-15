@@ -15,12 +15,35 @@ const itemSchema = z.object({
   })
 })
 
+const itemWithHddSchema = z.object({
+  id: z.coerce.number(),
+  title: z.string(),
+  url: z.string(),
+  image: z.string().url(),
+  price: z.number(),
+  description: z.string(),
+  review: z.object({
+    number: z.coerce.number(),
+    rating: z.number()
+  }),
+  hdd: z.array(
+    z.object({
+      size: z.coerce.number(),
+      enabled: z.boolean()
+    })
+  )
+})
+
 const itemsSchema = z.array(itemSchema)
+const itemsWithHddSchema = z.array(itemWithHddSchema)
 
 const BASE_URL =
   'https://webscraper.io/test-sites/e-commerce/allinone/computers/laptops'
 
-const prisma = new PrismaClient()
+const PRODUCT_URL = (id: number) =>
+  `https://webscraper.io/test-sites/e-commerce/allinone/product/${id}`
+
+const prisma = new PrismaClient({})
 
 const main = async () => {
   await prisma.$connect()
@@ -30,7 +53,6 @@ const main = async () => {
   })
 
   const cleanUp = async () => {
-    await prisma.$disconnect()
     await browser.close()
   }
 
@@ -80,7 +102,32 @@ const main = async () => {
   })
   console.log(`${lenovoLaptops.length} lenovo items found`)
 
-  const promises = lenovoLaptops.map((item) =>
+  const laptopsWithHddOptions = await Promise.all(
+    lenovoLaptops.map(async (laptop) => {
+      const page = await browser.newPage()
+
+      await page.goto(PRODUCT_URL(laptop.id))
+
+      const hddOptions = await page.$$eval('.swatches button', (items) => {
+        return items.map((item) => {
+          return {
+            size: item.innerHTML,
+            enabled: !item.classList.contains('disabled')
+          }
+        })
+      })
+
+      return { ...laptop, hdd: hddOptions }
+    })
+  )
+
+  const validItemsWithHdd = itemsWithHddSchema.safeParse(laptopsWithHddOptions)
+  if (!validItemsWithHdd.success) {
+    console.error('invalid item with hdd', validItemsWithHdd.error)
+    return await cleanUp()
+  }
+
+  const itemPromises = validItemsWithHdd.data.map((item) =>
     prisma.item.upsert({
       where: {
         id: item.id
@@ -106,7 +153,32 @@ const main = async () => {
       }
     })
   )
-  const result = await prisma.$transaction(promises)
+  const hddPromises = validItemsWithHdd.data
+    .map((item) =>
+      item.hdd.map((hddItem) =>
+        prisma.itemHddOption.upsert({
+          where: {
+            itemId_size: {
+              size: hddItem.size,
+              itemId: item.id
+            }
+          },
+          create: {
+            enabled: hddItem.enabled,
+            size: hddItem.size,
+            itemId: item.id
+          },
+          update: {
+            enabled: hddItem.enabled,
+            size: hddItem.size
+          }
+        })
+      )
+    )
+    .flat()
+
+  const result = await prisma.$transaction([...itemPromises, ...hddPromises])
+
   console.log(`${result.length} items upserted`)
 
   return await cleanUp()
@@ -115,3 +187,4 @@ const main = async () => {
 main()
   .then(() => console.log('finalizado'))
   .catch((err) => console.error)
+  .finally(async () => await prisma.$disconnect())

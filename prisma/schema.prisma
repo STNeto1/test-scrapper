@@ -11,7 +11,7 @@ datasource db {
 }
 
 model Item {
-  id           Int    @id
+  id           Int             @id
   title        String
   url          String
   image        String
@@ -19,4 +19,16 @@ model Item {
   description  String
   reviews_qty  Int
   review_score Int
+  hdd_options  ItemHddOption[]
+}
+
+model ItemHddOption {
+  id      Int     @id @default(autoincrement())
+  size    Int
+  enabled Boolean
+
+  item   Item @relation(fields: [itemId], references: [id])
+  itemId Int
+
+  @@unique([itemId, size])
 }
