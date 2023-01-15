@@ -7,7 +7,7 @@ const itemSchema = z.object({
   title: z.string(),
   url: z.string(),
   image: z.string().url(),
-  price: z.string(),
+  price: z.number(),
   description: z.string(),
   review: z.object({
     number: z.coerce.number(),
@@ -48,13 +48,16 @@ const main = async () => {
 
       const urlTokens = title?.getAttribute('href')?.split('/')
       const reviewsTokens = rawReviewsQty?.innerHTML.split(' ')
+      const cleanPrice = rawPrice
+        ? +rawPrice.innerHTML.replace(/\D+/g, '') / 100
+        : null
 
       return {
         id: urlTokens?.at(-1), // last element of the url tokens (should be the id)
         title: title?.getAttribute('title'),
         url: title?.getAttribute('href'),
         image: image?.src,
-        price: rawPrice?.innerHTML,
+        price: cleanPrice,
         description: description?.innerHTML,
         review: {
           number: reviewsTokens?.at(0),
