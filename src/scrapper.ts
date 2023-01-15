@@ -80,6 +80,35 @@ const main = async () => {
   })
   console.log(`${lenovoLaptops.length} lenovo items found`)
 
+  const promises = lenovoLaptops.map((item) =>
+    prisma.item.upsert({
+      where: {
+        id: item.id
+      },
+      create: {
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        image: item.image,
+        price: item.price,
+        description: item.description,
+        reviews_qty: item.review.number,
+        review_score: item.review.rating
+      },
+      update: {
+        title: item.title,
+        url: item.url,
+        image: item.image,
+        price: item.price,
+        description: item.description,
+        reviews_qty: item.review.number,
+        review_score: item.review.rating
+      }
+    })
+  )
+  const result = await prisma.$transaction(promises)
+  console.log(`${result.length} items upserted`)
+
   return await cleanUp()
 }
 
