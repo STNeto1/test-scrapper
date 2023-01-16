@@ -50,7 +50,7 @@ const main = async () => {
   await prisma.$connect()
 
   const browser = await chromium.launch({
-    headless: false
+    headless: true
   })
 
   const cleanUp = async () => {
