@@ -26,6 +26,7 @@ model ItemHddOption {
   id      Int     @id @default(autoincrement())
   size    Int
   enabled Boolean
+  price   Float // should be decimal
 
   item   Item @relation(fields: [itemId], references: [id])
   itemId Int

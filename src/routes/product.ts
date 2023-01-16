@@ -31,7 +31,8 @@ const completeItemSchema = z.object({
     z.object({
       id: z.number(),
       size: z.number(),
-      enabled: z.boolean()
+      enabled: z.boolean(),
+      price: z.number()
     })
   )
 })
@@ -149,7 +150,8 @@ export default fp(
           hdd_options: item.hdd_options.map((op) => ({
             id: op.id,
             size: op.size,
-            enabled: op.enabled
+            enabled: op.enabled,
+            price: op.price
           }))
         } satisfies z.infer<typeof completeItemSchema>
 

@@ -29,7 +29,8 @@ const itemWithHddSchema = z.object({
   hdd: z.array(
     z.object({
       size: z.coerce.number(),
-      enabled: z.boolean()
+      enabled: z.boolean(),
+      price: z.number()
     })
   )
 })
@@ -49,10 +50,11 @@ const main = async () => {
   await prisma.$connect()
 
   const browser = await chromium.launch({
-    headless: true
+    headless: false
   })
 
   const cleanUp = async () => {
+    await prisma.$disconnect()
     await browser.close()
   }
 
@@ -103,22 +105,37 @@ const main = async () => {
   console.log(`${lenovoLaptops.length} lenovo items found`)
 
   const laptopsWithHddOptions = await Promise.all(
-    lenovoLaptops.map(async (laptop) => {
-      const page = await browser.newPage()
+    lenovoLaptops
+      .filter((l) => l.id === 548)
+      .map(async (laptop) => {
+        const page = await browser.newPage()
 
-      await page.goto(PRODUCT_URL(laptop.id))
+        await page.goto(PRODUCT_URL(laptop.id))
 
-      const hddOptions = await page.$$eval('.swatches button', (items) => {
-        return items.map((item) => {
-          return {
-            size: item.innerHTML,
-            enabled: !item.classList.contains('disabled')
-          }
+        const hddOptions = await page.$$eval('.swatches button', (items) => {
+          return items.map((item) => {
+            return {
+              size: item.getAttribute('value'),
+              enabled: !item.classList.contains('disabled'),
+              price: -1
+            }
+          })
         })
-      })
 
-      return { ...laptop, hdd: hddOptions }
-    })
+        for await (const option of hddOptions) {
+          const buttonSelector = `button[value="${option.size}"]`
+
+          await page.locator(buttonSelector).click()
+
+          const rawPrice = await page.$eval('.caption .pull-right', (item) => {
+            return item.innerHTML
+          })
+
+          option.price = +rawPrice.replace(/\D+/g, '') / 100
+        }
+
+        return { ...laptop, hdd: hddOptions }
+      })
   )
 
   const validItemsWithHdd = itemsWithHddSchema.safeParse(laptopsWithHddOptions)
@@ -166,11 +183,13 @@ const main = async () => {
           create: {
             enabled: hddItem.enabled,
             size: hddItem.size,
-            itemId: item.id
+            itemId: item.id,
+            price: hddItem.price
           },
           update: {
             enabled: hddItem.enabled,
-            size: hddItem.size
+            size: hddItem.size,
+            price: hddItem.price
           }
         })
       )
@@ -186,5 +205,4 @@ const main = async () => {
 
 main()
   .then(() => console.log('finalizado'))
-  .catch((err) => console.error)
-  .finally(async () => await prisma.$disconnect())
+  .catch((err) => console.error(err))
